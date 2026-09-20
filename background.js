@@ -99,11 +99,11 @@ if (typeof chrome !== 'undefined' && chrome.tabs) {
 // with a 'command' field via Ya() which interferes with our handler.
 chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   if (message && message.action === 'op-inline-icon-clicked' && sender.tab) {
-    if (self._opToolbarHandler) {
+    var handled = typeof self._opToolbarHandler === 'function';
+    if (handled) {
       self._opToolbarHandler(sender.tab);
     }
-    sendResponse({ success: true });
-    return true;
+    sendResponse({ success: handled });
   }
 });
 

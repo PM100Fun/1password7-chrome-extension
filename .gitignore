@@ -2,3 +2,7 @@
 *.crx
 *.pem
 *.zip
+_metadata/
+__pycache__/
+*.pyc
+*.backup-*

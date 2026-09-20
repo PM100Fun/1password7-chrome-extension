@@ -13,7 +13,6 @@
 
   function createIcon(inputEl) {
     if (inputEl.getAttribute(PROCESSED_ATTR)) return;
-    inputEl.setAttribute(PROCESSED_ATTR, 'true');
 
     // Don't add to hidden, tiny, or read-only fields
     const rect = inputEl.getBoundingClientRect();
@@ -21,6 +20,10 @@
     if (inputEl.readOnly || inputEl.disabled) return;
     if (window.getComputedStyle(inputEl).visibility === 'hidden') return;
     if (window.getComputedStyle(inputEl).display === 'none') return;
+    if (!inputEl.parentNode) return;
+    // Mark only fields that can actually receive an icon. Hidden/disabled
+    // fields must remain eligible when a multi-step form reveals them later.
+    inputEl.setAttribute(PROCESSED_ATTR, 'true');
 
     const icon = document.createElement('img');
     icon.src = ICON_URL;
@@ -90,9 +93,6 @@
   }
 
   function positionIcon(inputEl, icon) {
-    const inputRect = inputEl.getBoundingClientRect();
-    const parentRect = inputEl.parentNode.getBoundingClientRect();
-
     icon.style.top = (inputEl.offsetTop + (inputEl.offsetHeight - ICON_SIZE) / 2) + 'px';
     icon.style.left = (inputEl.offsetLeft + inputEl.offsetWidth - ICON_SIZE - ICON_MARGIN) + 'px';
   }
@@ -134,6 +134,12 @@
       }
     }
   }
+
+  // A field can become visible without being inserted again (tabs, dialogs,
+  // multi-step forms). Retry when the user focuses it, without polling pages.
+  document.addEventListener('focusin', function(event) {
+    if (isLoginField(event.target)) createIcon(event.target);
+  });
 
   // Check for empty password fields and try auto-fill from background cache.
   // This handles full page navigations (e.g., username form submits to a new page

@@ -1,110 +1,121 @@
-# 1Password 7 Chrome Extension (Manifest V3)
+# 1Password 7 for Chrome — Community Edition
 
-A working Chrome extension for **1Password 7 standalone** (lifetime/one-time license), updated to Manifest V3.
+**Keep using your existing 1Password 7 desktop app with a Manifest V3 Chrome extension.**
 
-AgileBits deprecated and removed the original 1Password 7 Chrome extension, forcing users toward 1Password 8 (subscription-only). If you have a standalone/lifetime license, you were left without a working Chrome extension. This project brings it back.
+[简体中文](README.zh-CN.md) · [What changed](CHANGELOG.md) · [Download ZIP](https://github.com/PM100Fun/1password7-chrome-extension/archive/refs/heads/master.zip)
 
-## Features
+A community-maintained fork of [ferreirafabio/1password7-chrome-extension](https://github.com/ferreirafabio/1password7-chrome-extension), focused on reproducible macOS setup and small, tested usability fixes. This is an unofficial compatibility project, not a 1Password product.
 
-- Full autofill support via native messaging to the 1Password 7 desktop app
-- **Go & Fill** for two-step login flows — fills username, submits, then automatically fills the password when it appears (works on sites like Google, Microsoft, etc.)
-- Inline 1Password icon in password and login fields (click to fill)
-- Toolbar button, keyboard shortcut (Cmd+\ / Ctrl+\), and right-click context menu
-- Works with vaults stored locally or synced via Dropbox/iCloud
-- Manifest V3 compatible (works with current Chrome versions)
+## Why this fork?
 
-### Inline icon
+The extension code in our existing macOS installation matched upstream. The working native-host configuration did **not** match the host name described in its README. This fork turns that setup knowledge into a repeatable check/repair tool and documents exactly what is inherited and what we changed.
 
-![Inline 1Password icon in login fields](assets/screenshot-inline.png)
+| Inherited from upstream | Added in this fork, 4.7.5.91 |
+| --- | --- |
+| Manifest V3 service worker compatibility | Correct native-host setup matching the shipped code |
+| Native messaging to the desktop app | Read-only configuration check; explicit repair with backup |
+| Toolbar, context menu and inline field icons | Hidden/disabled fields remain eligible for icons when focused later |
+| Existing Go & Fill / two-step login logic | Accurate inline-click response when no toolbar handler is available |
+| Original public manifest key / stable extension ID | English/Chinese instructions and regression tests |
 
-## Requirements
+No subscription conversion, vault migration or new extension permissions are introduced by this fork. We do not promise permanent compatibility with future browser or desktop-app versions.
 
-- **1Password 7** desktop app installed and running (macOS)
-- A standalone/lifetime license (not subscription)
-- Google Chrome (or Chromium-based browser)
+## Quick start — macOS + Google Chrome
 
-## Installation
+You need an installed, licensed 1Password 7 desktop app with browser integration available. Python 3 is needed only for the optional setup tool. Node.js is needed only for development tests.
 
-### 1. Clone this repository
+1. Download and extract the ZIP above, or clone:
 
-```bash
-git clone https://github.com/ferreirafabio/1password7-chrome-extension.git
+   ```sh
+   git clone https://github.com/PM100Fun/1password7-chrome-extension.git
+   cd 1password7-chrome-extension
+   ```
+
+2. Keep the folder in a permanent location. In `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the folder containing `manifest.json`.
+3. Check that the extension ID is `aomjjhallfgjeglblehebfpbcfeobpgk`. This comes from the public `key` in the manifest; it is not a password or private key. If Chrome shows a different ID, use that actual ID with `--extension-id` below.
+4. Run the configuration check from the extracted/cloned folder:
+
+   ```sh
+   python3 scripts/configure_native_host.py
+   ```
+
+   If it reports `MISSING`, repair the existing allowlist:
+
+   ```sh
+   python3 scripts/configure_native_host.py --apply
+   ```
+
+   The tool validates the host name, helper path and allowlist, preserves other fields and entries, and creates a timestamped backup beside the JSON before replacing it. It does not read your vault or create a missing native host. A missing helper/host must be resolved through the desktop app installation first.
+
+5. Fully quit and reopen Chrome. Open and unlock 1Password 7, then try the toolbar button on a normal HTTPS login page.
+
+### Manual configuration
+
+The **shipped `global.min.js` actually requests**:
+
+```text
+2bua8c4s2c.com.agilebits.1password
 ```
 
-### 2. Add your extension ID to the native messaging host
+For Google Chrome on macOS, inspect:
 
-After loading the extension (step 3), Chrome assigns it an extension ID. You need to add this ID to 1Password's native messaging host configuration.
-
-Edit the file:
-```
-~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.1password.1password7.json
+```text
+~/Library/Application Support/Google/Chrome/NativeMessagingHosts/2bua8c4s2c.com.agilebits.1password.json
 ```
 
-Add your extension ID to the `allowed_origins` array:
-```json
-{
-  "allowed_origins": [
-    "chrome-extension://YOUR_EXTENSION_ID_HERE/",
-    "chrome-extension://aeblfdkhhhdcdjpifhhbdiojplfjncoa/",
-    ...
-  ]
-}
+Back up the existing file and add this entry to its `allowed_origins` array, preserving existing entries and the installed helper path:
+
+```text
+chrome-extension://aomjjhallfgjeglblehebfpbcfeobpgk/
 ```
 
-> **Note:** If you use the included `manifest.json` with the original `key` field, your extension ID will be `aomjjhallfgjeglblehebfpbcfeobpgk`. Add that to the `allowed_origins`.
+Editing only `com.1password.1password7.json` does not configure the host requested by this build. Do not replace a working helper path with a guessed SLS helper path.
 
-### 3. Load the extension in Chrome
+For a different existing host-file location or unpacked ID:
 
-1. Open `chrome://extensions`
-2. Enable **Developer mode** (toggle in the top right)
-3. Click **Load unpacked**
-4. Select the cloned repository folder
-5. Verify the extension loads without errors
+```sh
+python3 scripts/configure_native_host.py --host-file '/absolute/path/to/2bua8c4s2c.com.agilebits.1password.json' --extension-id YOUR_ACTUAL_EXTENSION_ID
+```
 
-### 4. Restart Chrome
-
-Quit Chrome completely (Cmd+Q) and reopen it. Native messaging host changes require a full restart.
-
-### 5. Unlock 1Password
-
-Open the 1Password 7 desktop app and unlock your vault. The extension communicates with the desktop app — it must be running and unlocked.
+Add `--apply` only after checking the result. To undo an applied repair, restore the backup file reported by the tool and fully restart Chrome. The tool's exit codes are `0` for OK/updated, `1` for missing allowlist entry and `2` for invalid/missing configuration.
 
 ## Troubleshooting
 
-| Error | Solution |
-|-------|----------|
-| "Native messaging host not found" | Check that `com.1password.1password7.json` exists in `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/` |
-| "Access to native messaging host is forbidden" | Your extension ID is not in `allowed_origins` — see step 2 above |
-| "Receiving end does not exist" | Harmless — happens on pages where content scripts can't run (e.g., `chrome://` pages) |
-| Extension icon doesn't respond | Make sure 1Password 7 is running and unlocked |
-| "1Password Extension Helper" not running | Open 1Password 7 → Preferences → Browsers → check "Always Keep 1Password Extension Helper Running" |
+| Symptom | Check |
+| --- | --- |
+| Native messaging host not found | Check the exact host filename above and the helper executable in its `path` field. |
+| Access to native messaging host is forbidden | Add the actual extension ID to that host's `allowed_origins`, then fully restart Chrome. |
+| Toolbar does nothing | Start/unlock 1Password 7; inspect the extension service worker error; check desktop browser integration. |
+| Hidden login field has no icon | Focus the field after it becomes visible; this version retries icon creation. |
+| Extension cannot run on `chrome://` pages | Test on an ordinary HTTP/HTTPS page instead. |
+| A two-step login fails | Use the toolbar again on the password step; upstream's automatic popup/fill behavior is retained and site-dependent. |
 
-## How it works
+## Compatibility and verification
 
-The extension communicates with the 1Password 7 desktop app through Chrome's [native messaging API](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging). The data flow is:
+- The pre-existing macOS installation was reported working by the maintainer; its extension files were compared byte-for-byte with upstream before these changes.
+- The local Chrome host name, existing allowlist and helper-file presence were checked with the new tool.
+- Configuration safety and JavaScript behavior have automated regression tests. See [validation notes](docs/VALIDATION.md).
+- End-to-end credential filling of this updated version is **not yet revalidated**. Automated tests do not prove all websites work.
+- Windows, Linux and other Chromium browsers are **not validated** by this fork. The setup tool defaults to macOS Chrome; passing a different file does not establish platform compatibility.
+- The extension receives credentials from the desktop app for filling. Broad HTTP/HTTPS access is inherited for this purpose. No telemetry or external service was added by this fork.
 
+## Development
+
+No build step or package installation is needed for the extension. Run checks with Python 3 and Node.js 18+:
+
+```sh
+python3 -m unittest discover -s tests -v
+node --test tests/extension.test.cjs
+node --check background.js
+node --check inline-icon.js
 ```
-Chrome Extension <-> Native Messaging Host <-> 1Password 7 App <-> Vault (local/Dropbox/iCloud)
-```
 
-The extension never accesses your vault directly. All credential operations go through the 1Password desktop app.
+Reports and contributions are welcome. Include OS, Chrome/1Password versions, steps and a redacted error message. Never include passwords, vault exports or unredacted credential data. If this fork helps you keep an existing setup working, a star helps others discover it.
 
-### MV2 to MV3 changes
+## Credits and licensing
 
-The `background.js` service worker provides compatibility shims for the original 1Password background code:
+- Original extension and assets: **AgileBits / 1Password**.
+- Manifest V3 port, inline icons and existing compatibility work: **[ferreirafabio](https://github.com/ferreirafabio/1password7-chrome-extension)** and the upstream history.
+- Configuration tooling, fixes and bilingual documentation in this fork: **PM100Fun**.
 
-- `chrome.browserAction` -> `chrome.action`
-- `chrome.contextMenus.create` with inline `onclick` -> `id` + `onClicked` listener
-- `webRequest` blocking mode -> `declarativeNetRequest` rules
-- `window` -> `self` (service worker context)
-- Native messaging host redirected from subscription to standalone (SLS) host
-
-## Disclaimer
-
-This project includes `global.min.js` and `injected.min.js` which are original works by [AgileBits Inc.](https://1password.com) (1Password), distributed as part of their free Chrome extension. These files are included here solely to restore functionality for licensed 1Password 7 users after Chrome deprecated Manifest V2. This project is not affiliated with or endorsed by AgileBits. All trademarks belong to their respective owners.
-
-The `background.js` service worker, `inline-icon.js`, and all other modifications are original work.
-
-## License
-
-The original work in this repository (background.js, inline-icon.js, README, etc.) is licensed under GPL-3.0 — see [LICENSE](LICENSE). The AgileBits files (global.min.js, injected.min.js, locales, assets) remain the property of AgileBits Inc.
+The community-authored code and modifications are under [GPL-3.0](LICENSE), retaining the upstream license. As noted by upstream, `global.min.js`, `injected.min.js`, locales and assets originate from AgileBits and retain their original ownership; this fork does not relicense those materials. Other third-party notices, including those in `ext/sjcl.js`, remain intact. 1Password trademarks belong to their owners. This project is not affiliated with or endorsed by 1Password.
